@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Run Ball</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="game-shell">
+      <canvas id="game"></canvas>
+
+      <section id="menu" class="screen">
+        <h1>Run Ball</h1>
+        <div class="panel-row" aria-label="Difficulty">
+          <button class="chip" data-difficulty="Easy">Easy</button>
+          <button class="chip active" data-difficulty="Medium">Medium</button>
+          <button class="chip" data-difficulty="Hard">Hard</button>
+        </div>
+        <p id="record">Hard Record: 0</p>
+        <div class="skin-grid" aria-label="Ball skins">
+          <button class="skin active" data-skin="velvet">Velvet</button>
+          <button class="skin" data-skin="matrix">Matrix</button>
+          <button class="skin" data-skin="alabaster">Alabaster</button>
+          <button class="skin" data-skin="bronze">Bronze</button>
+          <button class="skin" data-skin="silver">Silver</button>
+          <button class="skin" data-skin="gold">Gold</button>
+        </div>
+        <button id="start" class="primary">Launch Game</button>
+      </section>
+
+      <section id="game-over" class="screen hidden">
+        <h2>Game Over</h2>
+        <p id="final-score"></p>
+        <pre id="leaderboard"></pre>
+        <button id="return" class="primary">Return to Menu</button>
+      </section>
+
+      <div id="hud">
+        <span id="time">Time: 0s</span>
+        <span id="boost"></span>
+        <span id="score">Score: 0</span>
+      </div>
+    </main>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js"
+        }
+      }
+    </script>
+    <script type="module" src="./game.js"></script>
+  </body>
+</html>

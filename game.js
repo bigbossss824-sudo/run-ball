@@ -23,6 +23,9 @@ const BALL_RADIUS = 1;
 const BALL_GROUND_Y = TRACK_TOP_Y + BALL_RADIUS;
 const OBSTACLE_SIZE = 2.05;
 const OBSTACLE_CENTER_Y = TRACK_TOP_Y + (OBSTACLE_SIZE / 2);
+const SECOND_OBSTACLE_WIDTH_SCALE = 1.15;
+const SECOND_OBSTACLE_HEIGHT_SCALE = 3.2;
+const SECOND_OBSTACLE_DEPTH_SCALE = 1.15;
 const RAMP_HALF_WIDTH = 2.1;
 const RAMP_CONTACT_HALF_WIDTH = RAMP_HALF_WIDTH + BALL_RADIUS * 0.75;
 const OBSTACLE_HALF_WIDTH = OBSTACLE_SIZE / 2;
@@ -37,6 +40,9 @@ const MAX_JUMP_LAUNCH = 16;
 const MAX_PLAYER_HEIGHT = 14;
 const FALL_GAME_OVER_Y = -4;
 const DOUBLE_SCORE_SECONDS = 5;
+const THEME_SCORE_INTERVAL = 250;
+const LOG_OBSTACLE_START_TIME = 60;
+const GAME_OVER_DELAY_SECONDS = 1.15;
 
 const difficulties = {
   Easy: { startSpeed: 16, obstacleChance: 0.22, rampFrequency: 4 },
@@ -92,6 +98,8 @@ let selectedDifficulty = 'Medium';
 let selectedSkin = 'velvet';
 let running = false;
 let gameOver = false;
+let deathPending = false;
+let deathTimer = 0;
 let gameSpeed = 22;
 let gameTime = 0;
 let score = 0;
@@ -153,10 +161,13 @@ ball.add(skinPattern);
 const velvetTexture = makeVelvetTexture();
 const menuMusic = new Audio('./menu_loop.wav');
 const gameMusic = new Audio('./upbeat_loop.wav');
+const gameOverMusic = new Audio('./game_over_loop.wav');
 menuMusic.loop = true;
 gameMusic.loop = true;
+gameOverMusic.loop = true;
 menuMusic.volume = 0.28;
 gameMusic.volume = 0.38;
+gameOverMusic.volume = 0.36;
 
 function makeBox(w, h, d, color) {
   const mesh = new THREE.Mesh(
@@ -211,8 +222,7 @@ function makeVelvetTexture() {
 }
 
 function playTrack(track) {
-  if (!userStartedAudio) return;
-  [menuMusic, gameMusic].forEach((audio) => {
+  [menuMusic, gameMusic, gameOverMusic].forEach((audio) => {
     if (audio !== track) {
       audio.pause();
       audio.currentTime = 0;
@@ -221,8 +231,18 @@ function playTrack(track) {
   track.play().catch(() => {});
 }
 
+function playMenuMusic() {
+  playTrack(menuMusic);
+}
+
+function unlockAudio() {
+  if (userStartedAudio) return;
+  userStartedAudio = true;
+  if (!running && !gameOver && !deathPending) playMenuMusic();
+}
+
 function stopTracks() {
-  [menuMusic, gameMusic].forEach((audio) => {
+  [menuMusic, gameMusic, gameOverMusic].forEach((audio) => {
     audio.pause();
     audio.currentTime = 0;
   });
@@ -344,7 +364,7 @@ function currentTheme() {
 }
 
 function applyThemeForScore(nextScore) {
-  const nextIndex = Math.floor(nextScore / 1000);
+  const nextIndex = Math.floor(nextScore / THEME_SCORE_INTERVAL);
   if (nextIndex === activeThemeIndex) return;
   activeThemeIndex = nextIndex;
   const [sky, trackColor, platformColor, rampColor, obstacleColor, logColor] = currentTheme();
@@ -504,6 +524,8 @@ function resetGame() {
   playTrack(gameMusic);
   running = true;
   gameOver = false;
+  deathPending = false;
+  deathTimer = 0;
   falling = false;
   fallSide = 0;
   gameTime = 0;
@@ -591,10 +613,19 @@ function updateMenu() {
 }
 
 function endGame() {
+  if (gameOver || deathPending) return;
+  deathPending = true;
+  deathTimer = GAME_OVER_DELAY_SECONDS;
+  running = false;
+  gameMusic.pause();
+}
+
+function showGameOver() {
   if (gameOver) return;
   gameOver = true;
-  running = false;
+  deathPending = false;
   stopTracks();
+  playTrack(gameOverMusic);
   const finalScore = Math.floor(score);
   const scores = saveScore(finalScore);
   finalScoreEl.textContent = `Your Score: ${finalScore}`;
@@ -604,6 +635,12 @@ function endGame() {
 }
 
 function update(dt) {
+  if (deathPending) {
+    deathTimer -= dt;
+    ball.rotation.x += gameSpeed * 0.12 * dt;
+    if (deathTimer <= 0) showGameOver();
+    return;
+  }
   if (!running) return;
   gameTime += dt;
   gameSpeed += 0.65 * dt;
@@ -711,7 +748,7 @@ function updatePickups() {
 function recycleWorld() {
   const theme = currentTheme();
   for (const obstacle of obstacles) {
-    const obstacleHalfWidth = obstacle.userData.log ? 2 : OBSTACLE_HALF_WIDTH;
+    const obstacleHalfWidth = obstacle.userData.log ? (OBSTACLE_SIZE * SECOND_OBSTACLE_WIDTH_SCALE) / 2 : OBSTACLE_HALF_WIDTH;
     if (obstacle.userData.moving) {
       obstacle.position.x = obstacle.userData.baseX + Math.sin(gameTime * obstacle.userData.speed + obstacle.userData.phase) * obstacle.userData.range;
       obstacle.position.x = clampToVisibleTrack(obstacle.position.x, obstacleHalfWidth, 0.25);
@@ -728,12 +765,16 @@ function recycleWorld() {
       obstacle.position.set(safeX(z), OBSTACLE_CENTER_Y, z);
       obstacle.userData.baseX = obstacle.position.x;
       obstacle.userData.moving = Math.random() < 0.45;
-      obstacle.userData.log = gameTime > 120 && Math.random() < 0.4;
-      obstacle.scale.set(obstacle.userData.log ? 4.4 : 1, obstacle.userData.log ? 1.1 : 1, obstacle.userData.log ? 1.1 : 1);
-      obstacle.position.y = TRACK_TOP_Y + ((obstacle.userData.log ? OBSTACLE_SIZE * 1.1 : OBSTACLE_SIZE) / 2);
-      obstacle.position.x = clampToVisibleTrack(obstacle.position.x, obstacle.userData.log ? 2 : OBSTACLE_HALF_WIDTH, 0.25);
+      obstacle.userData.log = gameTime > LOG_OBSTACLE_START_TIME && Math.random() < 0.4;
+      obstacle.scale.set(
+        obstacle.userData.log ? SECOND_OBSTACLE_WIDTH_SCALE : 1,
+        obstacle.userData.log ? SECOND_OBSTACLE_HEIGHT_SCALE : 1,
+        obstacle.userData.log ? SECOND_OBSTACLE_DEPTH_SCALE : 1,
+      );
+      obstacle.position.y = TRACK_TOP_Y + ((obstacle.userData.log ? OBSTACLE_SIZE * SECOND_OBSTACLE_HEIGHT_SCALE : OBSTACLE_SIZE) / 2);
+      obstacle.position.x = clampToVisibleTrack(obstacle.position.x, obstacle.userData.log ? (OBSTACLE_SIZE * SECOND_OBSTACLE_WIDTH_SCALE) / 2 : OBSTACLE_HALF_WIDTH, 0.25);
       obstacle.userData.baseX = obstacle.position.x;
-      obstacle.userData.range = rand(0.45, Math.max(0.55, Math.min(2.6, availableMoveRange(obstacle.position.x, z, obstacle.userData.log ? 2 : OBSTACLE_HALF_WIDTH))));
+      obstacle.userData.range = rand(0.45, Math.max(0.55, Math.min(2.6, availableMoveRange(obstacle.position.x, z, obstacle.userData.log ? (OBSTACLE_SIZE * SECOND_OBSTACLE_WIDTH_SCALE) / 2 : OBSTACLE_HALF_WIDTH))));
       obstacle.material.color.set(obstacle.userData.log ? theme[5] : theme[4]);
     }
   }
@@ -768,9 +809,9 @@ function checkObstacleHits() {
     const dx = Math.abs(ball.position.x - obstacle.position.x);
     const dz = Math.abs(ball.position.z - obstacle.position.z);
     const dy = Math.abs(ball.position.y - obstacle.position.y);
-    const halfX = (obstacle.userData.log ? OBSTACLE_SIZE * 4.4 : OBSTACLE_SIZE) / 2;
-    const halfY = (obstacle.userData.log ? OBSTACLE_SIZE * 1.1 : OBSTACLE_SIZE) / 2;
-    const halfZ = (obstacle.userData.log ? OBSTACLE_SIZE * 1.1 : OBSTACLE_SIZE) / 2;
+    const halfX = (obstacle.userData.log ? OBSTACLE_SIZE * SECOND_OBSTACLE_WIDTH_SCALE : OBSTACLE_SIZE) / 2;
+    const halfY = (obstacle.userData.log ? OBSTACLE_SIZE * SECOND_OBSTACLE_HEIGHT_SCALE : OBSTACLE_SIZE) / 2;
+    const halfZ = (obstacle.userData.log ? OBSTACLE_SIZE * SECOND_OBSTACLE_DEPTH_SCALE : OBSTACLE_SIZE) / 2;
     if (dx < halfX + BALL_RADIUS * 0.92 && dz < halfZ + BALL_RADIUS * 0.92 && dy < halfY + BALL_RADIUS * 0.92) {
       ballMaterial.color.setHex(0x000000);
       endGame();
@@ -796,7 +837,11 @@ function resize() {
 }
 
 window.addEventListener('resize', resize);
-window.addEventListener('keydown', (event) => keys.add(event.key.toLowerCase()));
+window.addEventListener('pointerdown', unlockAudio);
+window.addEventListener('keydown', (event) => {
+  unlockAudio();
+  keys.add(event.key.toLowerCase());
+});
 window.addEventListener('keyup', (event) => keys.delete(event.key.toLowerCase()));
 
 document.querySelector('#start').addEventListener('click', resetGame);
@@ -804,7 +849,7 @@ document.querySelector('#return').addEventListener('click', () => {
   userStartedAudio = true;
   gameOverScreen.classList.add('hidden');
   menu.classList.remove('hidden');
-  playTrack(menuMusic);
+  playMenuMusic();
   updateMenu();
 });
 document.querySelectorAll('[data-difficulty]').forEach((button) => {
@@ -825,4 +870,5 @@ document.querySelectorAll('[data-skin]').forEach((button) => {
 resize();
 applyThemeForScore(0);
 updateMenu();
+playMenuMusic();
 requestAnimationFrame(animate);

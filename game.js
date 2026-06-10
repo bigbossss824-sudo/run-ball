@@ -4,6 +4,7 @@ const canvas = document.querySelector('#game');
 const menu = document.querySelector('#menu');
 const gameOverScreen = document.querySelector('#game-over');
 const hud = document.querySelector('#hud');
+const controlsHint = document.querySelector('#controls-hint');
 const scoreEl = document.querySelector('#score');
 const timeEl = document.querySelector('#time');
 const boostEl = document.querySelector('#boost');
@@ -114,6 +115,10 @@ let doubleScoreUntil = 0;
 let userStartedAudio = false;
 
 const keys = new Set();
+const touchControls = {
+  left: false,
+  right: false,
+};
 const obstacles = [];
 const ramps = [];
 const pickups = [];
@@ -161,13 +166,11 @@ ball.add(skinPattern);
 const velvetTexture = makeVelvetTexture();
 const menuMusic = new Audio('./menu_loop.wav');
 const gameMusic = new Audio('./upbeat_loop.wav');
-const gameOverMusic = new Audio('./game_over_loop.wav');
+let gameOverMusic = null;
 menuMusic.loop = true;
 gameMusic.loop = true;
-gameOverMusic.loop = true;
 menuMusic.volume = 0.28;
 gameMusic.volume = 0.38;
-gameOverMusic.volume = 0.36;
 
 function makeBox(w, h, d, color) {
   const mesh = new THREE.Mesh(
@@ -222,7 +225,7 @@ function makeVelvetTexture() {
 }
 
 function playTrack(track) {
-  [menuMusic, gameMusic, gameOverMusic].forEach((audio) => {
+  [menuMusic, gameMusic, gameOverMusic].filter(Boolean).forEach((audio) => {
     if (audio !== track) {
       audio.pause();
       audio.currentTime = 0;
@@ -232,7 +235,24 @@ function playTrack(track) {
 }
 
 function playMenuMusic() {
+  stopGameOverMusic();
   playTrack(menuMusic);
+}
+
+function playGameOverMusic() {
+  stopGameOverMusic();
+  gameOverMusic = new Audio('./game_over_loop.wav');
+  gameOverMusic.loop = false;
+  gameOverMusic.volume = 0.65;
+  playTrack(gameOverMusic);
+}
+
+function stopGameOverMusic() {
+  if (!gameOverMusic) return;
+  gameOverMusic.pause();
+  gameOverMusic.currentTime = 0;
+  gameOverMusic.volume = 0;
+  gameOverMusic = null;
 }
 
 function unlockAudio() {
@@ -242,10 +262,11 @@ function unlockAudio() {
 }
 
 function stopTracks() {
-  [menuMusic, gameMusic, gameOverMusic].forEach((audio) => {
+  [menuMusic, gameMusic, gameOverMusic].filter(Boolean).forEach((audio) => {
     audio.pause();
     audio.currentTime = 0;
   });
+  gameOverMusic = null;
 }
 
 function makePickup() {
@@ -545,6 +566,7 @@ function resetGame() {
   menu.classList.add('hidden');
   gameOverScreen.classList.add('hidden');
   hud.style.display = 'flex';
+  controlsHint.style.display = 'grid';
 }
 
 function applySkin() {
@@ -625,13 +647,14 @@ function showGameOver() {
   gameOver = true;
   deathPending = false;
   stopTracks();
-  playTrack(gameOverMusic);
+  playGameOverMusic();
   const finalScore = Math.floor(score);
   const scores = saveScore(finalScore);
   finalScoreEl.textContent = `Your Score: ${finalScore}`;
   leaderboardEl.textContent = `${selectedDifficulty} Top 10\n${scores.map((value, index) => `${index + 1}. ${value}`).join('\n')}`;
   gameOverScreen.classList.remove('hidden');
   hud.style.display = 'none';
+  controlsHint.style.display = 'none';
 }
 
 function update(dt) {
@@ -650,8 +673,8 @@ function update(dt) {
 
   if (!falling) {
     let direction = 0;
-    if (keys.has('a') || keys.has('arrowleft')) direction += 1;
-    if (keys.has('d') || keys.has('arrowright')) direction -= 1;
+    if (keys.has('a') || keys.has('arrowleft') || touchControls.left) direction += 1;
+    if (keys.has('d') || keys.has('arrowright') || touchControls.right) direction -= 1;
     if (direction !== 0) {
       xVelocity += direction * SIDE_ACCELERATION * dt;
       xVelocity = THREE.MathUtils.clamp(xVelocity, -SIDE_MAX_SPEED, SIDE_MAX_SPEED);
@@ -843,12 +866,31 @@ window.addEventListener('keydown', (event) => {
   keys.add(event.key.toLowerCase());
 });
 window.addEventListener('keyup', (event) => keys.delete(event.key.toLowerCase()));
+document.querySelectorAll('[data-touch-control]').forEach((control) => {
+  const side = control.dataset.touchControl;
+  const setPressed = (pressed) => {
+    touchControls[side] = pressed;
+    control.classList.toggle('pressed', pressed);
+  };
+
+  control.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    unlockAudio();
+    control.setPointerCapture?.(event.pointerId);
+    setPressed(true);
+  });
+  control.addEventListener('pointerup', () => setPressed(false));
+  control.addEventListener('pointercancel', () => setPressed(false));
+  control.addEventListener('lostpointercapture', () => setPressed(false));
+});
 
 document.querySelector('#start').addEventListener('click', resetGame);
 document.querySelector('#return').addEventListener('click', () => {
   userStartedAudio = true;
+  stopGameOverMusic();
   gameOverScreen.classList.add('hidden');
   menu.classList.remove('hidden');
+  controlsHint.style.display = 'none';
   playMenuMusic();
   updateMenu();
 });

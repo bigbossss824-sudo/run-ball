@@ -141,6 +141,53 @@ button.locked::after {
   text-align: center;
 }
 
+#controls-hint {
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  display: none;
+  grid-template-columns: repeat(2, 52px);
+  gap: 8px;
+  pointer-events: auto;
+  color: white;
+  text-align: center;
+  touch-action: none;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+}
+
+.control-column {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 5px 4px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.control-label {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.keycap,
+.arrow-key {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(12, 18, 23, 0.58);
+  color: #f7fbff;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.control-column.pressed .keycap,
+.control-column.pressed .arrow-key {
+  background: rgba(50, 167, 255, 0.72);
+}
+
 pre {
   margin: 0;
   color: white;
@@ -157,5 +204,19 @@ pre {
   #hud {
     top: 12px;
     font-size: 20px;
+  }
+
+  #controls-hint {
+    right: 10px;
+    bottom: 8px;
+    grid-template-columns: repeat(2, 46px);
+    gap: 6px;
+  }
+
+  .keycap,
+  .arrow-key {
+    width: 30px;
+    height: 22px;
+    font-size: 13px;
   }
 }

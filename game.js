@@ -639,6 +639,10 @@ function endGame() {
   deathPending = true;
   deathTimer = GAME_OVER_DELAY_SECONDS;
   running = false;
+  ballMaterial.map = null;
+  ballMaterial.color.setHex(0x000000);
+  ballMaterial.needsUpdate = true;
+  clearSkinPattern();
   gameMusic.pause();
 }
 
@@ -836,7 +840,6 @@ function checkObstacleHits() {
     const halfY = (obstacle.userData.log ? OBSTACLE_SIZE * SECOND_OBSTACLE_HEIGHT_SCALE : OBSTACLE_SIZE) / 2;
     const halfZ = (obstacle.userData.log ? OBSTACLE_SIZE * SECOND_OBSTACLE_DEPTH_SCALE : OBSTACLE_SIZE) / 2;
     if (dx < halfX + BALL_RADIUS * 0.92 && dz < halfZ + BALL_RADIUS * 0.92 && dy < halfY + BALL_RADIUS * 0.92) {
-      ballMaterial.color.setHex(0x000000);
       endGame();
     }
   }

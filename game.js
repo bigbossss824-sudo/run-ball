@@ -876,6 +876,10 @@ window.addEventListener('resize', resize);
 window.addEventListener('pointerdown', unlockAudio);
 window.addEventListener('keydown', (event) => {
   unlockAudio();
+  if (event.key.toLowerCase() === 'r' && gameOver) {
+    returnToMenu();
+    return;
+  }
   keys.add(event.key.toLowerCase());
 });
 window.addEventListener('keyup', (event) => keys.delete(event.key.toLowerCase()));
@@ -918,7 +922,7 @@ document.querySelectorAll('[data-touch-control]').forEach((control) => {
 });
 
 document.querySelector('#start').addEventListener('click', resetGame);
-document.querySelector('#return').addEventListener('click', () => {
+function returnToMenu() {
   userStartedAudio = true;
   stopGameOverMusic();
   gameOverScreen.classList.add('hidden');
@@ -926,7 +930,9 @@ document.querySelector('#return').addEventListener('click', () => {
   controlsHint.style.display = 'none';
   playMenuMusic();
   updateMenu();
-});
+}
+
+document.querySelector('#return').addEventListener('click', returnToMenu);
 document.querySelectorAll('[data-difficulty]').forEach((button) => {
   button.addEventListener('click', () => {
     selectedDifficulty = button.dataset.difficulty;

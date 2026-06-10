@@ -2,6 +2,11 @@
 
 This is a static browser version of the Run Ball game. Open `index.html` through a local web server, or deploy the folder to GitHub Pages, Netlify, or Vercel.
 
+The "menu_loop" is the music played for the menu. The "game_over_loop" is played when the player dies. The "upbeat_loop" is played when 
+the game is active and being played. 
+
+The "game.js" and the "styles.css" are code for the game.
+
 Public version:
 
 ```text
@@ -15,6 +20,7 @@ Quick local run:
 ```powershell
 python -m http.server 5173
 ```
+
 
 Then open:
 

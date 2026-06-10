@@ -44,6 +44,7 @@ const DOUBLE_SCORE_SECONDS = 5;
 const THEME_SCORE_INTERVAL = 250;
 const LOG_OBSTACLE_START_TIME = 60;
 const GAME_OVER_DELAY_SECONDS = 1.15;
+const RAMP_CONTACT_Y_TOLERANCE = 0.55;
 
 const difficulties = {
   Easy: { startSpeed: 16, obstacleChance: 0.22, rampFrequency: 4 },
@@ -116,6 +117,10 @@ let userStartedAudio = false;
 
 const keys = new Set();
 const touchControls = {
+  left: false,
+  right: false,
+};
+const screenTouchControls = {
   left: false,
   right: false,
 };
@@ -677,8 +682,8 @@ function update(dt) {
 
   if (!falling) {
     let direction = 0;
-    if (keys.has('a') || keys.has('arrowleft') || touchControls.left) direction += 1;
-    if (keys.has('d') || keys.has('arrowright') || touchControls.right) direction -= 1;
+    if (keys.has('a') || keys.has('arrowleft') || touchControls.left || screenTouchControls.left) direction += 1;
+    if (keys.has('d') || keys.has('arrowright') || touchControls.right || screenTouchControls.right) direction -= 1;
     if (direction !== 0) {
       xVelocity += direction * SIDE_ACCELERATION * dt;
       xVelocity = THREE.MathUtils.clamp(xVelocity, -SIDE_MAX_SPEED, SIDE_MAX_SPEED);
@@ -723,27 +728,32 @@ function update(dt) {
   } else {
     let ground = BALL_GROUND_Y;
     let onRamp = false;
+    let groundedOnRamp = false;
     for (const ramp of ramps) {
       const nearZ = ball.position.z >= ramp.position.z - 8 && ball.position.z <= ramp.position.z + 8;
       const nearX = Math.abs(ball.position.x - ramp.position.x) <= RAMP_CONTACT_HALF_WIDTH;
       if (nearZ && nearX) {
         const progress = (ball.position.z - (ramp.position.z - 8)) / 16;
-        ground = BALL_GROUND_Y + progress * 2.78;
-        onRamp = true;
+        const rampGround = BALL_GROUND_Y + progress * 2.78;
+        ground = Math.max(ground, rampGround);
+        if (ball.position.y <= rampGround + RAMP_CONTACT_Y_TOLERANCE) {
+          onRamp = true;
+        }
       }
     }
     if (ball.position.y <= ground) {
       ball.position.y = ground;
       if (yVelocity < 0) yVelocity = 0;
+      groundedOnRamp = onRamp;
     }
-    if (wasOnRamp && !onRamp) {
+    if (wasOnRamp && !groundedOnRamp) {
       yVelocity = Math.min(gameSpeed * 0.22, MAX_JUMP_LAUNCH);
     }
     if (ball.position.y > MAX_PLAYER_HEIGHT) {
       ball.position.y = MAX_PLAYER_HEIGHT;
       if (yVelocity > 0) yVelocity *= -0.15;
     }
-    wasOnRamp = onRamp;
+    wasOnRamp = groundedOnRamp;
   }
 
   updatePickups();
@@ -869,6 +879,26 @@ window.addEventListener('keydown', (event) => {
   keys.add(event.key.toLowerCase());
 });
 window.addEventListener('keyup', (event) => keys.delete(event.key.toLowerCase()));
+function setScreenTouch(side, pressed) {
+  screenTouchControls.left = side === 'left' ? pressed : false;
+  screenTouchControls.right = side === 'right' ? pressed : false;
+}
+
+canvas.addEventListener('pointerdown', (event) => {
+  if (!running || gameOver || deathPending) return;
+  event.preventDefault();
+  unlockAudio();
+  canvas.setPointerCapture?.(event.pointerId);
+  setScreenTouch(event.clientX < window.innerWidth / 2 ? 'left' : 'right', true);
+});
+canvas.addEventListener('pointermove', (event) => {
+  if (!running || gameOver || deathPending || (!screenTouchControls.left && !screenTouchControls.right)) return;
+  setScreenTouch(event.clientX < window.innerWidth / 2 ? 'left' : 'right', true);
+});
+canvas.addEventListener('pointerup', () => setScreenTouch(null, false));
+canvas.addEventListener('pointercancel', () => setScreenTouch(null, false));
+canvas.addEventListener('lostpointercapture', () => setScreenTouch(null, false));
+
 document.querySelectorAll('[data-touch-control]').forEach((control) => {
   const side = control.dataset.touchControl;
   const setPressed = (pressed) => {

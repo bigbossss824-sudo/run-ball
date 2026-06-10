@@ -1,0 +1,2 @@
+# No Python packages are required to run the web version.
+# The browser version uses Three.js from a CDN in index.html/play.html.
